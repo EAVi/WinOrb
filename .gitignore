@@ -1,0 +1,8 @@
+#build files
+/WinOrb/Debug/* 
+/WinOrb/Release/*
+/WinOrb/.vs
+
+#build metadata
+/WinOrb/WinOrb/Debug/* 
+/WinOrb/WinOrb/Release/*
