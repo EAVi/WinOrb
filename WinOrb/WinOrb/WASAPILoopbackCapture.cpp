@@ -15,21 +15,23 @@ const IID IID_IAudioClient = __uuidof(IAudioClient);
 const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 
 //shift an array to the left
-template<typename T, size_t N>
-void LShiftArray(T a[N], size_t numshifts)
+template<typename T, int size>
+void LShiftArray(T (&a)[size], size_t numshifts)
 {
 	if (numshifts == 0)
 		return;
-	if (numshifts >= N)
+	if (numshifts >= size)
 	{
 		memset(&a[0], 0, sizeof(a));
 		return;
 	}
 
-	size_t keep = N - numshifts; // amount we're keeping from the original array
+	size_t keep = size - numshifts; // amount we're keeping from the original array
 	memmove(&a[0], &a[numshifts], sizeof(T) * keep);
 	memset(&a[keep], 0, numshifts);
 }
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
 WASAPILoopbackCapture::WASAPILoopbackCapture()
 {
@@ -71,11 +73,7 @@ bool WASAPILoopbackCapture::Init()
 	hr = mpAudioClient->GetService(IID_IAudioCaptureClient, (void**)&mpCaptureClient);
 	RETURN_ON_FAIL(hr);
 
-	//audio sink will be passed into the capture function
-	//any information about format will need to be stored
-	//todo remove this commment when everything works
-
-	mhnsActualDuration = REFTIMES_PER_SEC * bufferFrameCount / mpwfx->nSamplesPerSec;
+	mhnsActualDuration = (double)REFTIMES_PER_SEC * bufferFrameCount / mpwfx->nSamplesPerSec;
 	hr = mpAudioClient->Start();
 	RETURN_ON_FAIL(hr);
 
@@ -102,8 +100,20 @@ bool WASAPILoopbackCapture::Capture()
 		{
 			pData = nullptr;
 		}
-
-		//copy pData here
+		else //copy data to buffer
+		{
+			constexpr size_t asize = ARRAY_SIZE(mSample);
+			size_t adjustedLen = packetLength * mpwfx->nChannels;
+			LShiftArray(mSample, adjustedLen);
+			size_t writestart = asize - adjustedLen;
+			if (writestart < 0)
+			{
+				writestart = 0;
+				adjustedLen = asize;
+			}
+			memcpy(&mSample[writestart], (void*)pData, adjustedLen * sizeof(float));
+			mSamplesCollected += packetLength;
+		}
 
 		hr = mpCaptureClient->ReleaseBuffer(numFramesAvailable);
 		RETURN_ON_FAIL(hr);
@@ -126,4 +136,23 @@ bool WASAPILoopbackCapture::Destroy()
 	RELEASE(mpAudioClient);
 	RELEASE(mpCaptureClient);
 	return true;
+}
+
+complex_sample WASAPILoopbackCapture::GetSample(bool leftchannel)
+{
+	complex_sample sample;
+	//channels are interlaced between eachother on the buffer,
+	// eg [l, r, l, r, l, r, ...] 
+	//naturally, we only care about one channel at a time
+	int numchannels = mpwfx->nChannels;
+	int start = leftchannel ? 0 : (numchannels - 1);
+	
+	if (numchannels <= 0 || mSamplesCollected == 0)
+		return sample;
+
+	for (int i = start, dstindex = 0; i < kFullSampleSize; i += numchannels, ++dstindex)
+	{
+		sample.emplace_back(mSample[i], 0.0f);
+	}
+	return sample;
 }

@@ -139,10 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FFT.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="WASAPILoopbackCapture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FFT.h" />
     <ClInclude Include="WASAPILoopbackCapture.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

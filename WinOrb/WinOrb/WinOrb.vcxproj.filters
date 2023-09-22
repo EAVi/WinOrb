@@ -21,9 +21,15 @@
     <ClCompile Include="WASAPILoopbackCapture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FFT.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="WASAPILoopbackCapture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FFT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
