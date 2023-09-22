@@ -1,8 +1,10 @@
 #build files
 /WinOrb/Debug/* 
 /WinOrb/Release/*
+/WinOrb/x64/*
 /WinOrb/.vs
 
 #build metadata
 /WinOrb/WinOrb/Debug/* 
 /WinOrb/WinOrb/Release/*
+/Winorb/WinOrb/x64/*

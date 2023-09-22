@@ -32,5 +32,14 @@
     <ClInclude Include="FFT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WindowsPlotDraw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanDoodler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WindowManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
