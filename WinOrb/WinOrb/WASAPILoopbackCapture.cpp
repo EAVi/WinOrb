@@ -36,7 +36,6 @@ void LShiftArray(T (&a)[size], size_t numshifts)
 WASAPILoopbackCapture::WASAPILoopbackCapture()
 {
 	memset(&mSample[0], 0, sizeof(mSample));
-	Init();
 }
 
 bool WASAPILoopbackCapture::Init()

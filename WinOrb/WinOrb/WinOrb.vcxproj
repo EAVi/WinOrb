@@ -159,7 +159,9 @@
   <ItemGroup>
     <ClCompile Include="FFT.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="VulkanDoodler.cpp" />
     <ClCompile Include="WASAPILoopbackCapture.cpp" />
+    <ClCompile Include="WindowManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FFT.h" />

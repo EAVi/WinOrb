@@ -1,7 +1,12 @@
 #ifndef WINDOWS_PLOT_DRAW
 #define WINDOWS_PLOT_DRAW
 
+//think this file is useless, consider deleting
+
 #include "FFT.h"
+#include "WindowManager.h"
+#include "WASAPILoopbackCapture.h"
+#include "VulkanDoodler.h"
 
 //the idea is that I'll eventually make an abstract base class for drawing the FFT onto the Chosen One's Orb
 
@@ -15,10 +20,9 @@ public:
 	void Destroy();
 
 private:
-	//glfw window manager
-	//vulkan manager
-	//imgui instance? I think I can just singleton it
-
+	WASAPILoopbackCapture mCapture;
+	WindowManager mWindow;
+	VulkanDoodler mDoodler;
 };
 
 #endif //!WINDOWS_PLOT_DRAW
