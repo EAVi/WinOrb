@@ -46,6 +46,10 @@ void VulkanDoodler::Init(GLFWwindow* window)
 	CreateImageViews();
 	CreateRenderPass();
 	CreateGraphicsPipeline();
+	CreateFrameBuffers();
+	CreateCommandPool();
+	CreateCommandBuffer();
+	CreateSyncObjects();
 }
 
 void VulkanDoodler::CreateSurface(GLFWwindow* window)
@@ -284,7 +288,14 @@ void VulkanDoodler::CreateRenderPass()
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
-
+	
+	VkSubpassDependency dependency{};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 	VkRenderPassCreateInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -292,6 +303,8 @@ void VulkanDoodler::CreateRenderPass()
 	renderPassInfo.pAttachments = &colorAttachment;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
 
 	assert(vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass) == VK_SUCCESS);
 }
@@ -313,6 +326,86 @@ void VulkanDoodler::CreateFrameBuffers()
 		assert(vkCreateFramebuffer(mDevice, &framebufferInfo, nullptr, &mFrameBuffers[i]) == VK_SUCCESS);
 	}
 }
+
+void VulkanDoodler::CreateCommandPool()
+{
+	uint32_t index;
+	(void)GetQueueFamilyFromFlag(mPhysicalDevice, index);
+	VkCommandPoolCreateInfo cmdpoolInfo{};
+	cmdpoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmdpoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	cmdpoolInfo.queueFamilyIndex = index;
+
+	assert(vkCreateCommandPool(mDevice, &cmdpoolInfo, nullptr, &mCommandPool) == VK_SUCCESS);
+}
+
+void VulkanDoodler::CreateCommandBuffer()
+{
+	VkCommandBufferAllocateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	bufferInfo.commandPool = mCommandPool;
+	bufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	bufferInfo.commandBufferCount = 1;
+
+	assert(vkAllocateCommandBuffers(mDevice, &bufferInfo, &mCommandBuffer) == VK_SUCCESS);
+}
+
+void VulkanDoodler::CreateSyncObjects()
+{
+	VkSemaphoreCreateInfo semaphoreinfo{};
+	semaphoreinfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	
+	assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreImageAvailable) == VK_SUCCESS);
+	assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreRenderFinish) == VK_SUCCESS);
+	assert(vkCreateFence(mDevice, &fenceInfo, nullptr, &mFenceInFlight) == VK_SUCCESS);
+
+}
+
+void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex)
+{
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = 0;
+	beginInfo.pInheritanceInfo = nullptr;
+
+	assert(vkBeginCommandBuffer(mCommandBuffer, &beginInfo) == VK_SUCCESS);
+
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = mRenderPass;
+	renderPassInfo.framebuffer = mFrameBuffers[imageIndex];
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = mSwapExtent;
+	VkClearValue clearcolor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.pClearValues = &clearcolor;
+
+	vkCmdBeginRenderPass(mCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicsPipeline);
+	
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)mSwapExtent.width;
+	viewport.height = (float)mSwapExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(mCommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = mSwapExtent;
+	vkCmdSetScissor(mCommandBuffer, 0, 1, &scissor);
+	vkCmdDraw(mCommandBuffer, 3, 1, 0, 0);
+	
+	vkCmdEndRenderPass(mCommandBuffer);
+	assert(vkEndCommandBuffer(mCommandBuffer) == VK_SUCCESS);
+}
+
 
 VkShaderModule VulkanDoodler::CreateShaderModule(const std::vector<char>& code)
 {
@@ -554,6 +647,7 @@ void VulkanDoodler::CreateLogicalDevice()
 	assert(vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) == VK_SUCCESS);
 
 	vkGetDeviceQueue(mDevice, indices, 0, &mDeviceQueue);
+	vkGetDeviceQueue(mDevice, indices, 0, &mPresentQueue);
 }
 
 bool VulkanDoodler::GetQueueFamilyFromFlag(VkPhysicalDevice device, uint32_t& index, VkQueueFlagBits flag)
@@ -581,6 +675,39 @@ bool VulkanDoodler::GetQueueFamilyFromFlag(VkPhysicalDevice device, uint32_t& in
 
 void VulkanDoodler::Update()
 {
+	vkWaitForFences(mDevice, 1, &mFenceInFlight, VK_TRUE, UINT64_MAX);
+	vkResetFences(mDevice, 1, &mFenceInFlight);
+
+	uint32_t imageIndex;
+	assert(vkAcquireNextImageKHR(mDevice, mSwapChain, UINT64_MAX, mSemaphoreImageAvailable, VK_NULL_HANDLE, &imageIndex) == VK_SUCCESS );
+	assert(vkResetCommandBuffer(mCommandBuffer, 0) == VK_SUCCESS);
+	RecordCommandBuffer(mCommandBuffer, imageIndex);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	VkSemaphore waitSemaphores[] = { mSemaphoreImageAvailable };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &mCommandBuffer;
+	VkSemaphore signalSemaphores[] = { mSemaphoreRenderFinish };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	assert(vkQueueSubmit(mDeviceQueue, 1, &submitInfo, mFenceInFlight) == VK_SUCCESS);
+
+	VkPresentInfoKHR presentInfo{};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &mSwapChain;
+	presentInfo.pImageIndices = &imageIndex;
+	presentInfo.pResults = nullptr;
+
+	assert(vkQueuePresentKHR(mPresentQueue, &presentInfo) == VK_SUCCESS);
 }
 
 void VulkanDoodler::Destroy()
@@ -589,6 +716,7 @@ void VulkanDoodler::Destroy()
 	{
 		DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
 	}
+	vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
 	for (auto framebuffer : mFrameBuffers)
 	{
 		vkDestroyFramebuffer(mDevice, framebuffer, nullptr);
@@ -597,6 +725,9 @@ void VulkanDoodler::Destroy()
 	{
 		vkDestroyImageView(mDevice, imageview, nullptr);
 	}
+	vkDestroySemaphore(mDevice, mSemaphoreImageAvailable, nullptr);
+	vkDestroySemaphore(mDevice, mSemaphoreRenderFinish, nullptr);
+	vkDestroyFence(mDevice, mFenceInFlight, nullptr);
 	vkDestroySwapchainKHR(mDevice, mSwapChain, nullptr);
 	vkDestroyPipeline(mDevice, mGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);

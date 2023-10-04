@@ -29,6 +29,11 @@ private:
 	VkRenderPass mRenderPass;
 	VkPipeline mGraphicsPipeline;
 	std::vector<VkFramebuffer> mFrameBuffers;
+	VkCommandPool mCommandPool;
+	VkCommandBuffer mCommandBuffer;
+	VkSemaphore mSemaphoreImageAvailable;
+	VkSemaphore mSemaphoreRenderFinish;
+	VkFence mFenceInFlight;
 private:
 	//init
 	void CreateInstance();
@@ -41,6 +46,12 @@ private:
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
 	void CreateFrameBuffers();
+	void CreateCommandPool();
+	void CreateCommandBuffer();
+	void CreateSyncObjects();
+
+	//writing/drawing
+	void RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex);
 
 	//init helpers / callbacks
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
