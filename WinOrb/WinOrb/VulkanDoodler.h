@@ -21,9 +21,13 @@ private:
 	VkSurfaceKHR mSurface;
 	VkSwapchainKHR mSwapChain;
 	std::vector<VkImage> mSwapImages;
+	std::vector<VkImageView> mImageViews;
 	VkFormat mSwapFormat;
 	VkExtent2D mSwapExtent;
 	VkPresentModeKHR mSwapMode;
+	VkPipelineLayout mPipelineLayout;
+	VkRenderPass mRenderPass;
+	VkPipeline mGraphicsPipeline;
 private:
 	//init
 	void CreateInstance();
@@ -32,9 +36,13 @@ private:
 	void CreateLogicalDevice();
 	void CreateSurface(GLFWwindow* window);
 	void CreateSwapChain(GLFWwindow* window);
-	void GetSwapChainImages(std::vector<VkImage>& images);
+	void CreateImageViews();
+	void CreateGraphicsPipeline();
+	void CreateRenderPass();
 
 	//init helpers / callbacks
+	VkShaderModule CreateShaderModule(const std::vector<char>& code);
+	void GetSwapChainImages(std::vector<VkImage>& images);
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 	bool CheckDeviceSwapChainSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSurfaceFormat();

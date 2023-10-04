@@ -4,6 +4,9 @@
 /WinOrb/x64/*
 /WinOrb/.vs
 
+#spirv shader ouput
+*.spv
+
 #build metadata
 /WinOrb/WinOrb/Debug/* 
 /WinOrb/WinOrb/Release/*

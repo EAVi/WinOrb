@@ -158,6 +158,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="FFT.cpp" />
+    <ClCompile Include="File.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VulkanDoodler.cpp" />
     <ClCompile Include="WASAPILoopbackCapture.cpp" />
@@ -166,6 +167,7 @@
   <ItemGroup>
     <ClInclude Include="FFT.h" />
     <ClInclude Include="VulkanDoodler.h" />
+    <ClInclude Include="File.h" />
     <ClInclude Include="WASAPILoopbackCapture.h" />
     <ClInclude Include="WindowManager.h" />
     <ClInclude Include="WindowsPlotDraw.h" />

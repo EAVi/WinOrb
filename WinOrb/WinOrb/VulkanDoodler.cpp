@@ -1,4 +1,5 @@
 #include "VulkanDoodler.h"
+#include "File.h"
 #include "GLFW/glfw3.h"
 #include "glm/common.hpp"
 #include <vector>
@@ -42,6 +43,9 @@ void VulkanDoodler::Init(GLFWwindow* window)
 	GetBestGraphicsDevice();
 	CreateLogicalDevice();
 	CreateSwapChain(window);
+	CreateImageViews();
+	CreateRenderPass();
+	CreateGraphicsPipeline();
 }
 
 void VulkanDoodler::CreateSurface(GLFWwindow* window)
@@ -79,7 +83,7 @@ void VulkanDoodler::CreateSwapChain(GLFWwindow* window)
 		createInfo.queueFamilyIndexCount = 0;
 		createInfo.pQueueFamilyIndices = nullptr;
 	}
-	//else
+	else
 	{
 		assert(false && "If you're reading this, I took a shortcut and your gpu is not supported lmao");
 	}
@@ -96,6 +100,211 @@ void VulkanDoodler::CreateSwapChain(GLFWwindow* window)
 	mSwapFormat = format.format;
 	mSwapMode = mode;
 	mSwapExtent = extent;
+}
+
+void VulkanDoodler::CreateImageViews()
+{
+	mImageViews.resize(mSwapImages.size());
+
+	VkImageViewCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	createInfo.format = mSwapFormat;
+	createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	createInfo.subresourceRange.baseMipLevel = 0;
+	createInfo.subresourceRange.levelCount = 1;
+	createInfo.subresourceRange.baseArrayLayer = 0;
+	createInfo.subresourceRange.layerCount = 1;
+
+	for (size_t i = 0; i < mImageViews.size(); ++i)
+	{
+		createInfo.image = mSwapImages[i];
+		assert(vkCreateImageView(mDevice, &createInfo, nullptr, &mImageViews[i]) == VK_SUCCESS);
+	}
+}
+
+void VulkanDoodler::CreateGraphicsPipeline()
+{
+	auto vertCode = readfile("shaders/vert.spv");
+	auto fragCode = readfile("shaders/frag.spv");
+
+	VkShaderModule vertModule = CreateShaderModule(vertCode);
+	VkShaderModule fragModule = CreateShaderModule(fragCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+	std::vector<VkDynamicState> dynamicStates =
+	{
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+	VkPipelineDynamicStateCreateInfo dynamicState{};
+	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicState.dynamicStateCount = (uint32_t)dynamicStates.size();
+	dynamicState.pDynamicStates = dynamicStates.data();
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = 0;
+	vertexInputInfo.pVertexBindingDescriptions = nullptr;
+	vertexInputInfo.vertexBindingDescriptionCount = 0;
+	vertexInputInfo.pVertexBindingDescriptions = nullptr;
+
+	VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+	assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)mSwapExtent.width;
+	viewport.height = (float)mSwapExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = mSwapExtent;
+
+	VkPipelineViewportStateCreateInfo viewportInfo{};
+	viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportInfo.viewportCount = 1;
+	//viewportInfo.pViewports = &viewport;//comment away for dynamic state
+	viewportInfo.scissorCount = 1;
+	//viewportInfo.pScissors = &scissor;//comment away for dynamic state
+
+	VkPipelineRasterizationStateCreateInfo rasterInfo{};
+	rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterInfo.depthClampEnable = VK_FALSE;
+	rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+	rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterInfo.lineWidth = 1.0f;
+	rasterInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterInfo.depthBiasEnable = VK_FALSE;
+	rasterInfo.depthBiasConstantFactor = 0.0f;
+	rasterInfo.depthBiasClamp = 0.0f;
+	rasterInfo.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineMultisampleStateCreateInfo msInfo{};
+	msInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	msInfo.sampleShadingEnable = VK_FALSE;
+	msInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	msInfo.minSampleShading = 1.0f;
+	msInfo.pSampleMask = nullptr;
+	msInfo.alphaToCoverageEnable = VK_FALSE;
+	msInfo.alphaToOneEnable = VK_FALSE;
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	colorBlendAttachment.blendEnable = VK_TRUE;
+	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+	VkPipelineColorBlendStateCreateInfo colorBlend{};
+	colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlend.logicOpEnable = VK_FALSE;
+	colorBlend.logicOp = VK_LOGIC_OP_COPY;
+	colorBlend.attachmentCount = 1;
+	colorBlend.pAttachments = &colorBlendAttachment;
+	colorBlend.blendConstants[0] = 0.0f;
+	colorBlend.blendConstants[1] = 0.0f;
+	colorBlend.blendConstants[2] = 0.0f;
+	colorBlend.blendConstants[3] = 0.0f;
+	
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.pSetLayouts = nullptr;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	assert(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mPipelineLayout) == VK_SUCCESS);
+
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineInfo.stageCount = 2;
+	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.pVertexInputState = &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState = &assemblyInfo;
+	pipelineInfo.pViewportState = &viewportInfo;
+	pipelineInfo.pRasterizationState = &rasterInfo;
+	pipelineInfo.pMultisampleState = &msInfo;
+	pipelineInfo.pDepthStencilState = nullptr;
+	pipelineInfo.pColorBlendState = &colorBlend;
+	pipelineInfo.pDynamicState = &dynamicState;
+	pipelineInfo.layout = mPipelineLayout;
+	pipelineInfo.renderPass = mRenderPass;
+	pipelineInfo.subpass = 0;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+
+	assert(vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) == VK_SUCCESS);
+
+	vkDestroyShaderModule(mDevice, vertModule, nullptr);
+	vkDestroyShaderModule(mDevice, fragModule, nullptr);
+}
+
+void VulkanDoodler::CreateRenderPass()
+{
+	VkAttachmentDescription colorAttachment{};
+	colorAttachment.format = mSwapFormat;
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference colorAttachmentRef{};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass{};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentRef;
+
+
+	VkRenderPassCreateInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+
+	assert(vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass) == VK_SUCCESS);
+}
+
+VkShaderModule VulkanDoodler::CreateShaderModule(const std::vector<char>& code)
+{
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = (uint32_t*)code.data();
+	VkShaderModule shaderModule;
+	assert(vkCreateShaderModule(mDevice, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+	return shaderModule;
 }
 
 void VulkanDoodler::GetSwapChainImages(std::vector<VkImage>& images)
@@ -362,7 +571,14 @@ void VulkanDoodler::Destroy()
 	{
 		DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
 	}
+	for (auto imageview : mImageViews)
+	{
+		vkDestroyImageView(mDevice, imageview, nullptr);
+	}
 	vkDestroySwapchainKHR(mDevice, mSwapChain, nullptr);
+	vkDestroyPipeline(mDevice, mGraphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
+	vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
 	vkDestroyDevice(mDevice, nullptr);
 	vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
 	vkDestroyInstance(mInstance, nullptr); //MAKE SURE THIS ONE COMES LAST YA SILLY
