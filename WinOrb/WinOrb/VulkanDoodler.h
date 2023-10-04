@@ -28,6 +28,7 @@ private:
 	VkPipelineLayout mPipelineLayout;
 	VkRenderPass mRenderPass;
 	VkPipeline mGraphicsPipeline;
+	std::vector<VkFramebuffer> mFrameBuffers;
 private:
 	//init
 	void CreateInstance();
@@ -39,6 +40,7 @@ private:
 	void CreateImageViews();
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
+	void CreateFrameBuffers();
 
 	//init helpers / callbacks
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);

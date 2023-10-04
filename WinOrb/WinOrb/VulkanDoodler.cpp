@@ -296,6 +296,24 @@ void VulkanDoodler::CreateRenderPass()
 	assert(vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass) == VK_SUCCESS);
 }
 
+void VulkanDoodler::CreateFrameBuffers()
+{
+	mFrameBuffers.resize(mImageViews.size());
+	for (int i = 0; i < mImageViews.size(); ++i)
+	{
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = mRenderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = &mImageViews[i];
+		framebufferInfo.width = mSwapExtent.width;
+		framebufferInfo.height = mSwapExtent.height;
+		framebufferInfo.layers = 1;
+
+		assert(vkCreateFramebuffer(mDevice, &framebufferInfo, nullptr, &mFrameBuffers[i]) == VK_SUCCESS);
+	}
+}
+
 VkShaderModule VulkanDoodler::CreateShaderModule(const std::vector<char>& code)
 {
 	VkShaderModuleCreateInfo createInfo{};
@@ -570,6 +588,10 @@ void VulkanDoodler::Destroy()
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
+	}
+	for (auto framebuffer : mFrameBuffers)
+	{
+		vkDestroyFramebuffer(mDevice, framebuffer, nullptr);
 	}
 	for (auto imageview : mImageViews)
 	{
