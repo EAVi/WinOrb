@@ -1,16 +1,19 @@
 #ifndef VULKAN_DOODLER_H
 #define VULKAN_DOODLER_H
 
+#define GLFW_INCLUDE_VULKAN
+#include "WindowManager.h"
 #include "vulkan/vulkan.h"
 #include "GLFW/glfw3.h"
 #include <vector>
 
-class VulkanDoodler
+class VulkanDoodler : virtual public WindowManager
 {
 public:
-	void Init(GLFWwindow* window);
-	void Update();
-	void Destroy();
+	typedef WindowManager Super;
+	virtual void Init() override;
+	virtual void Update() override;
+	virtual void Destroy() override;
 private:
 	VkInstance mInstance;
 	VkDebugUtilsMessengerEXT mDebugMessenger;
@@ -30,18 +33,19 @@ private:
 	VkPipeline mGraphicsPipeline;
 	std::vector<VkFramebuffer> mFrameBuffers;
 	VkCommandPool mCommandPool;
-	VkCommandBuffer mCommandBuffer;
-	VkSemaphore mSemaphoreImageAvailable;
-	VkSemaphore mSemaphoreRenderFinish;
-	VkFence mFenceInFlight;
+	std::vector<VkCommandBuffer> mCommandBuffer;
+	std::vector<VkSemaphore> mSemaphoreImageAvailable;
+	std::vector<VkSemaphore> mSemaphoreRenderFinish;
+	std::vector<VkFence> mFenceInFlight;
+	uint32_t mCurrentFrame = 0;
 private:
 	//init
 	void CreateInstance();
 	void SetupMessengerCallback();
 	void GetBestGraphicsDevice();
 	void CreateLogicalDevice();
-	void CreateSurface(GLFWwindow* window);
-	void CreateSwapChain(GLFWwindow* window);
+	void CreateSurface();
+	void CreateSwapChain();
 	void CreateImageViews();
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
@@ -49,6 +53,10 @@ private:
 	void CreateCommandPool();
 	void CreateCommandBuffer();
 	void CreateSyncObjects();
+	void ReCreateSwapChain();
+	void DestroySwapChain();
+
+	bool IsMinimized();
 
 	//writing/drawing
 	void RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex);
@@ -60,7 +68,7 @@ private:
 	bool CheckDeviceSwapChainSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSurfaceFormat();
 	VkPresentModeKHR ChoosePresentMode();
-	VkExtent2D ChooseSwapExtent(GLFWwindow* window);
+	VkExtent2D ChooseSwapExtent();
 	bool GetQueueFamilyFromFlag(VkPhysicalDevice device, uint32_t& index, VkQueueFlagBits flag = VK_QUEUE_GRAPHICS_BIT);
 	bool CheckValidationLayerSupported();
 	int ScoreDevice(VkPhysicalDevice device);
@@ -76,7 +84,6 @@ private:
 	static void DestroyDebugUtilsMessengerEXT(VkInstance instance, 
 		VkDebugUtilsMessengerEXT debugMessenger, 
 		const VkAllocationCallbacks* pAllocator);
-	//figure it out
 };
 
 #endif //! VULKAN_DOODLER_H

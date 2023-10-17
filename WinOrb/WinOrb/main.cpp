@@ -8,12 +8,10 @@ int main()
 	CoInitialize(NULL);
 
 	WASAPILoopbackCapture device;
-	WindowManager window;
 	VulkanDoodler doodler;
 	device.Init();
- 	window.Init();
-	doodler.Init(window.GetWindowPtr());
-	while (window.Update())
+	doodler.Init();
+	while (!doodler.IsQuit())
 	{
 		Sleep(16);
 		device.Capture();
@@ -23,7 +21,6 @@ int main()
 	}
 	
 	device.Destroy();
-	window.Destroy();
 	doodler.Destroy();
 	return 0;
 }

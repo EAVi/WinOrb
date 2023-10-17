@@ -1,37 +1,44 @@
 #include "WindowManager.h"
+#include <cassert>
 
-bool WindowManager::Init()
+void WindowManager::Init()
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	mWindow = glfwCreateWindow(width, height, "Purple's Orb of Pondering", nullptr, nullptr);
-	return mWindow != nullptr;
+	mQuit = false;
+
+	glfwSetWindowUserPointer(mWindow, this);
+	glfwSetWindowSizeCallback(mWindow, FramebufferSizeCallback);
+
+	assert(mWindow != nullptr);
 }
 
-bool WindowManager::Update()
+void WindowManager::Update()
 {
-	if (mWindow == nullptr)
-	{
-		return false;
-	}
+	assert(mWindow != nullptr);
 	if (!glfwWindowShouldClose(mWindow))
 	{
 		glfwPollEvents();
-		mQuit = true;
-		return true;
 	}
-	return false;
+	else
+	{
+		mQuit = true;
+	}
 }
 
-bool WindowManager::Destroy()
+void WindowManager::Destroy()
 {
 	glfwDestroyWindow(mWindow);
 	glfwTerminate();
-	return true;
 }
 
-GLFWwindow* WindowManager::GetWindowPtr()
+void WindowManager::FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
-	return mWindow;
+	auto windowuser = reinterpret_cast<WindowManager*>(glfwGetWindowUserPointer(window));
+	if (windowuser != nullptr)
+	{
+		windowuser->mResize = true;
+	}
 }

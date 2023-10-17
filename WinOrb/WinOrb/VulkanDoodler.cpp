@@ -13,6 +13,8 @@ const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
@@ -35,14 +37,15 @@ std::vector<const char*> GetRequiredInstanceExtensions()
 	return extensions;
 }
 
-void VulkanDoodler::Init(GLFWwindow* window)
+void VulkanDoodler::Init()
 {
+	Super::Init();
 	CreateInstance();
 	SetupMessengerCallback();
-	CreateSurface(window);
+	CreateSurface();
 	GetBestGraphicsDevice();
 	CreateLogicalDevice();
-	CreateSwapChain(window);
+	CreateSwapChain();
 	CreateImageViews();
 	CreateRenderPass();
 	CreateGraphicsPipeline();
@@ -52,16 +55,16 @@ void VulkanDoodler::Init(GLFWwindow* window)
 	CreateSyncObjects();
 }
 
-void VulkanDoodler::CreateSurface(GLFWwindow* window)
+void VulkanDoodler::CreateSurface()
 {
-	assert(glfwCreateWindowSurface(mInstance, window, nullptr, &mSurface) == VK_SUCCESS);
+	assert(glfwCreateWindowSurface(mInstance, mWindow, nullptr, &mSurface) == VK_SUCCESS);
 }
 
-void VulkanDoodler::CreateSwapChain(GLFWwindow* window)
+void VulkanDoodler::CreateSwapChain()
 {
 	auto format = ChooseSurfaceFormat();
 	auto mode = ChoosePresentMode();
-	auto extent = ChooseSwapExtent(window);
+	auto extent = ChooseSwapExtent();
 
 	VkSurfaceCapabilitiesKHR cap;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice, mSurface, &cap);
@@ -341,17 +344,23 @@ void VulkanDoodler::CreateCommandPool()
 
 void VulkanDoodler::CreateCommandBuffer()
 {
+	mCommandBuffer.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkCommandBufferAllocateInfo bufferInfo{};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	bufferInfo.commandPool = mCommandPool;
 	bufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	bufferInfo.commandBufferCount = 1;
+	bufferInfo.commandBufferCount = (uint32_t)mCommandBuffer.size();
 
-	assert(vkAllocateCommandBuffers(mDevice, &bufferInfo, &mCommandBuffer) == VK_SUCCESS);
+	assert(vkAllocateCommandBuffers(mDevice, &bufferInfo, mCommandBuffer.data()) == VK_SUCCESS);
 }
 
 void VulkanDoodler::CreateSyncObjects()
 {
+	mSemaphoreImageAvailable.resize(MAX_FRAMES_IN_FLIGHT);
+	mSemaphoreRenderFinish.resize(MAX_FRAMES_IN_FLIGHT);
+	mFenceInFlight.resize(MAX_FRAMES_IN_FLIGHT);
+
 	VkSemaphoreCreateInfo semaphoreinfo{};
 	semaphoreinfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 	
@@ -359,10 +368,44 @@ void VulkanDoodler::CreateSyncObjects()
 	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 	
-	assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreImageAvailable) == VK_SUCCESS);
-	assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreRenderFinish) == VK_SUCCESS);
-	assert(vkCreateFence(mDevice, &fenceInfo, nullptr, &mFenceInFlight) == VK_SUCCESS);
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreImageAvailable[i]) == VK_SUCCESS);
+		assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreRenderFinish[i]) == VK_SUCCESS);
+		assert(vkCreateFence(mDevice, &fenceInfo, nullptr, &mFenceInFlight[i]) == VK_SUCCESS);
+	}
 
+}
+
+void VulkanDoodler::ReCreateSwapChain()
+{
+	vkDeviceWaitIdle(mDevice);
+	DestroySwapChain();
+
+	CreateSwapChain();
+	CreateImageViews();
+	CreateFrameBuffers();
+}
+
+void VulkanDoodler::DestroySwapChain()
+{
+	for (auto framebuffer : mFrameBuffers)
+	{
+		vkDestroyFramebuffer(mDevice, framebuffer, nullptr);
+	}
+	for (auto imageview : mImageViews)
+	{
+		vkDestroyImageView(mDevice, imageview, nullptr);
+	}
+	vkDestroySwapchainKHR(mDevice, mSwapChain, nullptr);
+}
+
+bool VulkanDoodler::IsMinimized()
+{
+	int width = 0;
+	int height = 0;
+	glfwGetWindowSize(mWindow, &width, &height);
+	return width == 0 || height == 0;
 }
 
 void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex)
@@ -372,7 +415,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	beginInfo.flags = 0;
 	beginInfo.pInheritanceInfo = nullptr;
 
-	assert(vkBeginCommandBuffer(mCommandBuffer, &beginInfo) == VK_SUCCESS);
+	assert(vkBeginCommandBuffer(commandbuffer, &beginInfo) == VK_SUCCESS);
 
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -384,8 +427,8 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	renderPassInfo.clearValueCount = 1;
 	renderPassInfo.pClearValues = &clearcolor;
 
-	vkCmdBeginRenderPass(mCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicsPipeline);
+	vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicsPipeline);
 	
 	VkViewport viewport{};
 	viewport.x = 0.0f;
@@ -394,16 +437,16 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	viewport.height = (float)mSwapExtent.height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(mCommandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
 
 	VkRect2D scissor{};
 	scissor.offset = { 0, 0 };
 	scissor.extent = mSwapExtent;
-	vkCmdSetScissor(mCommandBuffer, 0, 1, &scissor);
-	vkCmdDraw(mCommandBuffer, 3, 1, 0, 0);
+	vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
+	vkCmdDraw(commandbuffer, 3, 1, 0, 0);
 	
-	vkCmdEndRenderPass(mCommandBuffer);
-	assert(vkEndCommandBuffer(mCommandBuffer) == VK_SUCCESS);
+	vkCmdEndRenderPass(commandbuffer);
+	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
 }
 
 
@@ -506,7 +549,7 @@ VkPresentModeKHR VulkanDoodler::ChoosePresentMode()
 	return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D VulkanDoodler::ChooseSwapExtent(GLFWwindow* window)
+VkExtent2D VulkanDoodler::ChooseSwapExtent()
 {
 	VkSurfaceCapabilitiesKHR capabilities;
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice, mSurface, &capabilities);
@@ -517,7 +560,7 @@ VkExtent2D VulkanDoodler::ChooseSwapExtent(GLFWwindow* window)
 	else
 	{
 		VkExtent2D extent;
-		glfwGetFramebufferSize(window, (int*)&extent.width, (int*)&extent.height); //this is the wild wild west, yeehaw
+		glfwGetFramebufferSize(mWindow, (int*)&extent.width, (int*)&extent.height); //this is the wild wild west, yeehaw
 
 		extent.width = glm::clamp(extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 		extent.height = glm::clamp(extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
@@ -675,28 +718,47 @@ bool VulkanDoodler::GetQueueFamilyFromFlag(VkPhysicalDevice device, uint32_t& in
 
 void VulkanDoodler::Update()
 {
-	vkWaitForFences(mDevice, 1, &mFenceInFlight, VK_TRUE, UINT64_MAX);
-	vkResetFences(mDevice, 1, &mFenceInFlight);
+	Super::Update();
+
+	if (IsMinimized())
+	{
+		return;
+	}
+
+	vkWaitForFences(mDevice, 1, &mFenceInFlight[mCurrentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
-	assert(vkAcquireNextImageKHR(mDevice, mSwapChain, UINT64_MAX, mSemaphoreImageAvailable, VK_NULL_HANDLE, &imageIndex) == VK_SUCCESS );
-	assert(vkResetCommandBuffer(mCommandBuffer, 0) == VK_SUCCESS);
-	RecordCommandBuffer(mCommandBuffer, imageIndex);
+	VkResult nextImageRes = vkAcquireNextImageKHR(mDevice, mSwapChain, UINT64_MAX, mSemaphoreImageAvailable[mCurrentFrame], VK_NULL_HANDLE, &imageIndex);
+	if (nextImageRes == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		ReCreateSwapChain();
+		return;
+	}
+	else
+	{
+		assert(nextImageRes == VK_SUCCESS || nextImageRes == VK_SUBOPTIMAL_KHR);
+	}
+
+	vkResetFences(mDevice, 1, &mFenceInFlight[mCurrentFrame]);
+
+
+	assert(vkResetCommandBuffer(mCommandBuffer[mCurrentFrame], 0) == VK_SUCCESS);
+	RecordCommandBuffer(mCommandBuffer[mCurrentFrame], imageIndex);
 
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	VkSemaphore waitSemaphores[] = { mSemaphoreImageAvailable };
+	VkSemaphore waitSemaphores[] = { mSemaphoreImageAvailable[mCurrentFrame] };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &mCommandBuffer;
-	VkSemaphore signalSemaphores[] = { mSemaphoreRenderFinish };
+	submitInfo.pCommandBuffers = &mCommandBuffer[mCurrentFrame];
+	VkSemaphore signalSemaphores[] = { mSemaphoreRenderFinish[mCurrentFrame] };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	assert(vkQueueSubmit(mDeviceQueue, 1, &submitInfo, mFenceInFlight) == VK_SUCCESS);
+	assert(vkQueueSubmit(mDeviceQueue, 1, &submitInfo, mFenceInFlight[mCurrentFrame]) == VK_SUCCESS);
 
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -707,28 +769,36 @@ void VulkanDoodler::Update()
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr;
 
-	assert(vkQueuePresentKHR(mPresentQueue, &presentInfo) == VK_SUCCESS);
+	VkResult resPresent = vkQueuePresentKHR(mPresentQueue, &presentInfo);
+	if (resPresent == VK_ERROR_OUT_OF_DATE_KHR || resPresent == VK_SUBOPTIMAL_KHR || mResize)
+	{
+		ReCreateSwapChain();
+	}
+	else
+	{
+		assert(resPresent == VK_SUCCESS);
+	}
+	++mCurrentFrame %= MAX_FRAMES_IN_FLIGHT;
 }
 
 void VulkanDoodler::Destroy()
 {
+	Super::Destroy();
+	vkDeviceWaitIdle(mDevice);
+
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
 	}
 	vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
-	for (auto framebuffer : mFrameBuffers)
+	
+	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		vkDestroyFramebuffer(mDevice, framebuffer, nullptr);
+		vkDestroySemaphore(mDevice, mSemaphoreImageAvailable[i], nullptr);
+		vkDestroySemaphore(mDevice, mSemaphoreRenderFinish[i], nullptr);
+		vkDestroyFence(mDevice, mFenceInFlight[i], nullptr);
 	}
-	for (auto imageview : mImageViews)
-	{
-		vkDestroyImageView(mDevice, imageview, nullptr);
-	}
-	vkDestroySemaphore(mDevice, mSemaphoreImageAvailable, nullptr);
-	vkDestroySemaphore(mDevice, mSemaphoreRenderFinish, nullptr);
-	vkDestroyFence(mDevice, mFenceInFlight, nullptr);
-	vkDestroySwapchainKHR(mDevice, mSwapChain, nullptr);
+	DestroySwapChain();
 	vkDestroyPipeline(mDevice, mGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
 	vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
