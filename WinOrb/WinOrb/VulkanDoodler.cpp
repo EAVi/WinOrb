@@ -2,6 +2,7 @@
 #include "File.h"
 #include "GLFW/glfw3.h"
 #include "glm/common.hpp"
+#include "Vertex.h"
 #include <vector>
 #include <cassert>
 
@@ -167,10 +168,12 @@ void VulkanDoodler::CreateGraphicsPipeline()
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr;
+	auto vertexbindingdesc = Vertex2::getBindingDescription();
+	auto vertexattrdesc = Vertex2::getAttributeDescription();
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.pVertexBindingDescriptions = &vertexbindingdesc;
+	vertexInputInfo.vertexAttributeDescriptionCount= vertexattrdesc.size();
+	vertexInputInfo.pVertexAttributeDescriptions = vertexattrdesc.data();
 
 	VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
 	assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
