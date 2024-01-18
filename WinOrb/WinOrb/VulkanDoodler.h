@@ -33,6 +33,8 @@ private:
 	VkPipeline mGraphicsPipeline;
 	std::vector<VkFramebuffer> mFrameBuffers;
 	VkCommandPool mCommandPool;
+	VkBuffer mVertexBuffer;
+	VkDeviceMemory mVertexBufferMemory;
 	std::vector<VkCommandBuffer> mCommandBuffer;
 	std::vector<VkSemaphore> mSemaphoreImageAvailable;
 	std::vector<VkSemaphore> mSemaphoreRenderFinish;
@@ -51,6 +53,7 @@ private:
 	void CreateRenderPass();
 	void CreateFrameBuffers();
 	void CreateCommandPool();
+	void CreateVertexBuffer();
 	void CreateCommandBuffer();
 	void CreateSyncObjects();
 	void ReCreateSwapChain();
@@ -72,6 +75,7 @@ private:
 	bool GetQueueFamilyFromFlag(VkPhysicalDevice device, uint32_t& index, VkQueueFlagBits flag = VK_QUEUE_GRAPHICS_BIT);
 	bool CheckValidationLayerSupported();
 	int ScoreDevice(VkPhysicalDevice device);
+	uint32_t FindMemoryType(uint32_t filter, VkMemoryPropertyFlags propFlags);
 	static VKAPI_ATTR VkBool32 VKAPI_CALL validationCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT           messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT                  messageTypes,

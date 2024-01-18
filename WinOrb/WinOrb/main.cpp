@@ -2,6 +2,7 @@
 #include "WindowManager.h"
 #include "VulkanDoodler.h"
 #include "FFT.h"
+#include <assert.h>
 
 int main()
 {
@@ -9,7 +10,7 @@ int main()
 
 	WASAPILoopbackCapture device;
 	VulkanDoodler doodler;
-	device.Init();
+	assert(device.Init());
 	doodler.Init();
 	while (!doodler.IsQuit())
 	{

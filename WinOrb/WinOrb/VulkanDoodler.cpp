@@ -14,6 +14,12 @@ const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
+const std::vector<Vertex2> vertices = {
+	{{0.0f, -0.5}, {1.0f, 0.0f, 0.0f}},
+	{{0.5, 0.5}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5}, {0.0f, 0.0f, 1.0f}},
+};
+
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 #ifdef NDEBUG
@@ -53,6 +59,7 @@ void VulkanDoodler::Init()
 	CreateFrameBuffers();
 	CreateCommandPool();
 	CreateCommandBuffer();
+	CreateVertexBuffer();
 	CreateSyncObjects();
 }
 
@@ -172,7 +179,7 @@ void VulkanDoodler::CreateGraphicsPipeline()
 	auto vertexattrdesc = Vertex2::getAttributeDescription();
 	vertexInputInfo.vertexBindingDescriptionCount = 1;
 	vertexInputInfo.pVertexBindingDescriptions = &vertexbindingdesc;
-	vertexInputInfo.vertexAttributeDescriptionCount= vertexattrdesc.size();
+	vertexInputInfo.vertexAttributeDescriptionCount= (uint32_t)vertexattrdesc.size();
 	vertexInputInfo.pVertexAttributeDescriptions = vertexattrdesc.data();
 
 	VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
@@ -345,6 +352,34 @@ void VulkanDoodler::CreateCommandPool()
 	assert(vkCreateCommandPool(mDevice, &cmdpoolInfo, nullptr, &mCommandPool) == VK_SUCCESS);
 }
 
+void VulkanDoodler::CreateVertexBuffer()
+{
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	assert(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &mVertexBuffer) == VK_SUCCESS);
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(mDevice, mVertexBuffer, &memRequirements);
+
+	VkMemoryAllocateInfo vkMemInfo{};
+	vkMemInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	vkMemInfo.allocationSize = memRequirements.size;
+	vkMemInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	assert(vkAllocateMemory(mDevice, &vkMemInfo, nullptr, &mVertexBufferMemory) == VK_SUCCESS);
+
+	vkBindBufferMemory(mDevice, mVertexBuffer, mVertexBufferMemory, 0);
+
+	void* data;
+	vkMapMemory(mDevice, mVertexBufferMemory, 0, bufferInfo.size, 0, &data);
+	memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+	vkUnmapMemory(mDevice, mVertexBufferMemory);
+}
+
 void VulkanDoodler::CreateCommandBuffer()
 {
 	mCommandBuffer.resize(MAX_FRAMES_IN_FLIGHT);
@@ -432,6 +467,10 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 
 	vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mGraphicsPipeline);
+
+	VkBuffer vertexbuffers[] = { mVertexBuffer };
+	VkDeviceSize offsets[] = { 0 };
+	vkCmdBindVertexBuffers(commandbuffer, 0, 1, vertexbuffers, offsets);
 	
 	VkViewport viewport{};
 	viewport.x = 0.0f;
@@ -446,7 +485,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	scissor.offset = { 0, 0 };
 	scissor.extent = mSwapExtent;
 	vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
-	vkCmdDraw(commandbuffer, 3, 1, 0, 0);
+	vkCmdDraw(commandbuffer, (uint32_t)vertices.size(), 1, 0, 0);
 	
 	vkCmdEndRenderPass(commandbuffer);
 	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
@@ -802,6 +841,8 @@ void VulkanDoodler::Destroy()
 		vkDestroyFence(mDevice, mFenceInFlight[i], nullptr);
 	}
 	DestroySwapChain();
+	vkDestroyBuffer(mDevice, mVertexBuffer, nullptr);
+	vkFreeMemory(mDevice, mVertexBufferMemory, nullptr);
 	vkDestroyPipeline(mDevice, mGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
 	vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
@@ -866,6 +907,24 @@ int VulkanDoodler::ScoreDevice(VkPhysicalDevice device)
 
 	score += properties.limits.maxImageDimension2D;
 	return score;
+}
+
+uint32_t VulkanDoodler::FindMemoryType(uint32_t filter, VkMemoryPropertyFlags propFlags)
+{
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+	{
+		if ((filter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & propFlags) == propFlags)
+		{
+			return i;
+		}
+
+	}
+
+	assert(false && "failed to find memory type!");
+	return uint32_t();
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDoodler::validationCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)

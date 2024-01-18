@@ -104,14 +104,28 @@ bool WASAPILoopbackCapture::Capture()
 			constexpr size_t asize = ARRAY_SIZE(mSample);
 			size_t adjustedLen = packetLength * mpwfx->nChannels;
 			LShiftArray(mSample, adjustedLen);
-			size_t writestart = asize - adjustedLen;
-			if (writestart < 0)
+			if (asize >= adjustedLen)
 			{
-				writestart = 0;
-				adjustedLen = asize;
+				size_t writestart = asize - adjustedLen;
+				if (writestart < 0)
+				{
+					writestart = 0;
+					adjustedLen = asize;
+				}
+				mSamplesCollected += packetLength;
+				memcpy(&mSample[writestart], (void*)pData, adjustedLen * sizeof(float));
 			}
-			memcpy(&mSample[writestart], (void*)pData, adjustedLen * sizeof(float));
-			mSamplesCollected += packetLength;
+			else
+			{
+				size_t writestart = adjustedLen - asize;
+				if (writestart < 0)
+				{
+					writestart = 0;
+					adjustedLen = asize;
+				}
+				memcpy(&mSample[0], (void*)&pData[writestart], asize * sizeof(float));
+				mSamplesCollected += packetLength;
+			}
 		}
 
 		hr = mpCaptureClient->ReleaseBuffer(numFramesAvailable);
