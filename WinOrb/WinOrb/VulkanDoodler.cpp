@@ -354,30 +354,37 @@ void VulkanDoodler::CreateCommandPool()
 
 void VulkanDoodler::CreateVertexBuffer()
 {
-	VkBufferCreateInfo bufferInfo{};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	uint32_t buffersize = sizeof(vertices[0]) * vertices.size();
 
-	assert(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &mVertexBuffer) == VK_SUCCESS);
 
-	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(mDevice, mVertexBuffer, &memRequirements);
-
-	VkMemoryAllocateInfo vkMemInfo{};
-	vkMemInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	vkMemInfo.allocationSize = memRequirements.size;
-	vkMemInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	assert(vkAllocateMemory(mDevice, &vkMemInfo, nullptr, &mVertexBufferMemory) == VK_SUCCESS);
-
-	vkBindBufferMemory(mDevice, mVertexBuffer, mVertexBufferMemory, 0);
+	//staging buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	CreateBuffer(buffersize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, 
+		stagingBufferMemory
+		);
 
 	void* data;
-	vkMapMemory(mDevice, mVertexBufferMemory, 0, bufferInfo.size, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferInfo.size);
-	vkUnmapMemory(mDevice, mVertexBufferMemory);
+	vkMapMemory(mDevice, stagingBufferMemory, 0, buffersize, 0, &data);
+	memcpy(data, vertices.data(), (size_t)buffersize);
+	vkUnmapMemory(mDevice, stagingBufferMemory);
+
+
+	//vertex buffer
+	CreateBuffer(buffersize, 
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		mVertexBuffer, 
+		mVertexBufferMemory
+	);
+
+	CopyBuffer(mVertexBuffer, stagingBuffer, buffersize);
+
+	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
 }
 
 void VulkanDoodler::CreateCommandBuffer()
@@ -491,6 +498,63 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
 }
 
+void VulkanDoodler::CopyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size)
+{
+	VkCommandBufferAllocateInfo allocinfo{};
+	allocinfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocinfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocinfo.commandPool = mCommandPool;
+	allocinfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(mDevice, &allocinfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	VkBufferCopy copy{};
+	copy.dstOffset = 0;
+	copy.srcOffset = 0;
+	copy.size = size;
+	vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copy);
+
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+	vkQueueSubmit(mDeviceQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(mDeviceQueue);
+	vkFreeCommandBuffers(mDevice, mCommandPool, 1, &commandBuffer);
+}
+
+
+void VulkanDoodler::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& memory)
+{
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = size;
+	bufferInfo.usage = usage;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	assert(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &buffer) == VK_SUCCESS);
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(mDevice, buffer, &memRequirements);
+
+	VkMemoryAllocateInfo vkMemInfo{};
+	vkMemInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	vkMemInfo.allocationSize = memRequirements.size;
+	vkMemInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
+
+	assert(vkAllocateMemory(mDevice, &vkMemInfo, nullptr, &memory) == VK_SUCCESS);
+
+	vkBindBufferMemory(mDevice, buffer, memory, 0);
+}
 
 VkShaderModule VulkanDoodler::CreateShaderModule(const std::vector<char>& code)
 {

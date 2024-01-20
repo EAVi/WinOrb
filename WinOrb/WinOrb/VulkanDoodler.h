@@ -63,8 +63,10 @@ private:
 
 	//writing/drawing
 	void RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex);
+	void CopyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size);
 
 	//init helpers / callbacks
+	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& memory);
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 	void GetSwapChainImages(std::vector<VkImage>& images);
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
