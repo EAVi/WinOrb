@@ -35,6 +35,8 @@ private:
 	VkCommandPool mCommandPool;
 	VkBuffer mVertexBuffer;
 	VkDeviceMemory mVertexBufferMemory;
+	VkBuffer mIndexBuffer;
+	VkDeviceMemory mIndexBufferMemory;
 	std::vector<VkCommandBuffer> mCommandBuffer;
 	std::vector<VkSemaphore> mSemaphoreImageAvailable;
 	std::vector<VkSemaphore> mSemaphoreRenderFinish;
@@ -54,9 +56,12 @@ private:
 	void CreateFrameBuffers();
 	void CreateCommandPool();
 	void CreateVertexBuffer();
+	void CreateIndexBuffer();
 	void CreateCommandBuffer();
 	void CreateSyncObjects();
 	void ReCreateSwapChain();
+
+	//destroy
 	void DestroySwapChain();
 
 	bool IsMinimized();

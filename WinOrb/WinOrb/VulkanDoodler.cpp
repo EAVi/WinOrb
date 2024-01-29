@@ -15,9 +15,14 @@ const std::vector<const char*> validationLayers = {
 };
 
 const std::vector<Vertex2> vertices = {
-	{{0.0f, -0.5}, {1.0f, 0.0f, 0.0f}},
-	{{0.5, 0.5}, {0.0f, 1.0f, 0.0f}},
-	{{-0.5f, 0.5}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+	{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0
 };
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -60,6 +65,7 @@ void VulkanDoodler::Init()
 	CreateCommandPool();
 	CreateCommandBuffer();
 	CreateVertexBuffer();
+	CreateIndexBuffer();
 	CreateSyncObjects();
 }
 
@@ -387,6 +393,37 @@ void VulkanDoodler::CreateVertexBuffer()
 	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
 }
 
+void VulkanDoodler::CreateIndexBuffer()
+{
+	VkDeviceSize buffersize = sizeof(indices[0]) * indices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	CreateBuffer(buffersize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+
+	void* data;
+	vkMapMemory(mDevice, stagingBufferMemory, 0, buffersize, 0, &data);
+	memcpy(data, indices.data(), (size_t)buffersize);
+	vkUnmapMemory(mDevice, stagingBufferMemory);
+
+	CreateBuffer(buffersize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		mIndexBuffer, 
+		mIndexBufferMemory
+	);
+
+	CopyBuffer(mIndexBuffer, stagingBuffer, buffersize);
+
+	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
+}
+
 void VulkanDoodler::CreateCommandBuffer()
 {
 	mCommandBuffer.resize(MAX_FRAMES_IN_FLIGHT);
@@ -478,6 +515,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	VkBuffer vertexbuffers[] = { mVertexBuffer };
 	VkDeviceSize offsets[] = { 0 };
 	vkCmdBindVertexBuffers(commandbuffer, 0, 1, vertexbuffers, offsets);
+	vkCmdBindIndexBuffer(commandbuffer, mIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 	
 	VkViewport viewport{};
 	viewport.x = 0.0f;
@@ -492,7 +530,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	scissor.offset = { 0, 0 };
 	scissor.extent = mSwapExtent;
 	vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
-	vkCmdDraw(commandbuffer, (uint32_t)vertices.size(), 1, 0, 0);
+	vkCmdDrawIndexed(commandbuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
 	
 	vkCmdEndRenderPass(commandbuffer);
 	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
@@ -907,6 +945,8 @@ void VulkanDoodler::Destroy()
 	DestroySwapChain();
 	vkDestroyBuffer(mDevice, mVertexBuffer, nullptr);
 	vkFreeMemory(mDevice, mVertexBufferMemory, nullptr);
+	vkDestroyBuffer(mDevice, mIndexBuffer, nullptr);
+	vkFreeMemory(mDevice, mIndexBufferMemory, nullptr);
 	vkDestroyPipeline(mDevice, mGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
 	vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
