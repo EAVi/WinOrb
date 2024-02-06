@@ -14,16 +14,71 @@ const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<Vertex2> vertices = {
-	{{-0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-	{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-};
+const std::vector<Vertex2> GenerateChartFromSample(std::vector<float> sample)
+{
+	std::vector<Vertex2> chart;
 
-const std::vector<uint16_t> indices = {
-	0, 1, 2, 2, 3, 0
-};
+	const float dbform = 10 / log(10);
+	const float intensitycoeff = 1.0f * 10e-12;
+	
+	static float smax = 32;
+	float maxval = 0;
+	for (int i = 0; i < sample.size(); ++i)
+		if (sample[i] > maxval)
+			maxval = sample[i];
+	if (maxval < 1)
+		maxval = 1;
+
+	smax = (smax + maxval) / 2;
+
+	for (int i = 0; i < sample.size(); ++i)
+	{
+		float x = 0;
+		if(i != 0) x = log(i) / log(10);
+		float y = dbform * log(sample[i] / intensitycoeff);
+		y /= 150;
+		x /= 3.01f;
+		//y /= smax;
+		y /= -1.0f;
+		//x -= 0.5f;
+
+		Vertex2 v1 = { {x - 0.5, y + 0.5f}, {1.0f, 0.0f, 0.0f} };
+		Vertex2 v2 = { {x - 0.5, .5f}, {0.0f, 1.0f, 1.0f} };
+
+		chart.push_back(v2);//bottom
+		chart.push_back(v1);//top
+	}
+	return chart;
+}
+
+const std::vector<uint16_t> generateindices(size_t size)
+{
+	std::vector<uint16_t> indices;
+	for (int i = 0; i < size; ++i)
+	{	
+		int twice = i * 2;
+		if (i != 0)
+		{
+			//finish the previous quad
+			indices.push_back(twice + 1);//top right
+
+			indices.push_back(twice + 1);//top right
+			indices.push_back(twice);//bottom right
+			indices.push_back(twice - 2);//bottom left
+
+			//start the next quad
+			indices.push_back(twice); //down left
+			indices.push_back(twice + 1);//top left
+		}
+		else //even
+		{
+			indices.push_back(twice); //down left
+			indices.push_back(twice + 1);//top left
+		}
+	}
+
+	return indices;
+}
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -360,7 +415,9 @@ void VulkanDoodler::CreateCommandPool()
 
 void VulkanDoodler::CreateVertexBuffer()
 {
-	uint32_t buffersize = sizeof(vertices[0]) * vertices.size();
+	std::vector<float> emptysample(1024, 1.0f);
+	auto chart = GenerateChartFromSample(emptysample);
+	uint32_t buffersize = sizeof(chart[0]) * chart.size();
 
 
 	//staging buffer
@@ -375,7 +432,7 @@ void VulkanDoodler::CreateVertexBuffer()
 
 	void* data;
 	vkMapMemory(mDevice, stagingBufferMemory, 0, buffersize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)buffersize);
+	memcpy(data, chart.data(), (size_t)buffersize);
 	vkUnmapMemory(mDevice, stagingBufferMemory);
 
 
@@ -395,6 +452,7 @@ void VulkanDoodler::CreateVertexBuffer()
 
 void VulkanDoodler::CreateIndexBuffer()
 {
+	auto indices = generateindices(1024);
 	VkDeviceSize buffersize = sizeof(indices[0]) * indices.size();
 
 	VkBuffer stagingBuffer;
@@ -490,6 +548,32 @@ bool VulkanDoodler::IsMinimized()
 	return width == 0 || height == 0;
 }
 
+void VulkanDoodler::UpdateChart(const std::vector<float>& Chart)
+{
+	auto chart = GenerateChartFromSample(Chart);
+	uint32_t buffersize = sizeof(chart[0]) * chart.size();
+
+	//staging buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	CreateBuffer(buffersize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+
+	void* data;
+	vkMapMemory(mDevice, stagingBufferMemory, 0, buffersize, 0, &data);
+	memcpy(data, chart.data(), (size_t)buffersize);
+	vkUnmapMemory(mDevice, stagingBufferMemory);
+
+	CopyBuffer(mVertexBuffer, stagingBuffer, buffersize);
+
+	vkDestroyBuffer(mDevice, stagingBuffer, nullptr);
+	vkFreeMemory(mDevice, stagingBufferMemory, nullptr);
+}
+
 void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t imageIndex)
 {
 	VkCommandBufferBeginInfo beginInfo{};
@@ -530,7 +614,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	scissor.offset = { 0, 0 };
 	scissor.extent = mSwapExtent;
 	vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
-	vkCmdDrawIndexed(commandbuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
+	vkCmdDrawIndexed(commandbuffer, (uint32_t)1024 * 3, 1, 0, 0, 0); //HARDOCDED AF
 	
 	vkCmdEndRenderPass(commandbuffer);
 	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);

@@ -14,6 +14,7 @@ public:
 	virtual void Init() override;
 	virtual void Update() override;
 	virtual void Destroy() override;
+	void UpdateChart(const std::vector<float>& Chart);
 private:
 	VkInstance mInstance;
 	VkDebugUtilsMessengerEXT mDebugMessenger;

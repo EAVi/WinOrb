@@ -18,6 +18,9 @@ int main()
 		device.Capture();
 		complex_sample samples = device.GetSample();
 		complex_sample frequency = FFT(samples);
+		std::vector<float> magnitudes = ToMagnitude(frequency);
+		magnitudes.resize(1024);
+		doodler.UpdateChart(magnitudes);
 		doodler.Update();
 	}
 	

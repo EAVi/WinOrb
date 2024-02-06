@@ -95,3 +95,13 @@ complex_sample IFFT(const complex_sample& sample)
 	}
 	return inverted;
 }
+
+std::vector<float> ToMagnitude(complex_sample sample)
+{
+	std::vector<float> retval;
+	for (auto val : sample)
+	{
+		retval.push_back(std::abs(val));
+	}
+	return retval;
+}
