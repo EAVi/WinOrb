@@ -3,11 +3,13 @@
 #include <AudioClient.h>
 #include <AudioPolicy.h>
 
-#define RETURN_ON_FAIL(hres) if(FAILED(hres)) return false;
+#define RETURN_ON_FAIL(hres) if(FAILED(hres)) throw; //return false;
 #define RELEASE(punk) if(punk){punk->Release(); punk = nullptr; }
 
 #define REFTIMES_PER_SEC  10000000
 #define REFTIMES_PER_MILLISEC  10000
+
+#pragma optimize("", off)
 
 const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
 const IID IID_IMMDeviceEnumerator = __uuidof(IMMDeviceEnumerator);

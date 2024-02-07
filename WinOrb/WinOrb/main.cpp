@@ -10,7 +10,7 @@ int main()
 
 	WASAPILoopbackCapture device;
 	VulkanDoodler doodler;
-	assert(device.Init());
+	device.Init();
 	doodler.Init();
 	while (!doodler.IsQuit())
 	{

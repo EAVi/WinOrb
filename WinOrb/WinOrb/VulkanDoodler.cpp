@@ -6,6 +6,9 @@
 #include <vector>
 #include <cassert>
 
+#pragma optimize("", off)
+#define swaggy_assert(expr) if(!(expr)) throw;
+
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
@@ -126,7 +129,8 @@ void VulkanDoodler::Init()
 
 void VulkanDoodler::CreateSurface()
 {
-	assert(glfwCreateWindowSurface(mInstance, mWindow, nullptr, &mSurface) == VK_SUCCESS);
+	swaggy_assert(glfwCreateWindowSurface(mInstance, mWindow, nullptr, &mSurface) == VK_SUCCESS);
+	//if(mSurface == VK_NULL_HANDLE) throw;
 }
 
 void VulkanDoodler::CreateSwapChain()
@@ -161,7 +165,7 @@ void VulkanDoodler::CreateSwapChain()
 	}
 	else
 	{
-		assert(false && "If you're reading this, I took a shortcut and your gpu is not supported lmao");
+		swaggy_assert(false && "If you're reading this, I took a shortcut and your gpu is not supported lmao");
 	}
 	createInfo.preTransform = cap.currentTransform;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -170,7 +174,7 @@ void VulkanDoodler::CreateSwapChain()
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VkResult res = vkCreateSwapchainKHR(mDevice, &createInfo, nullptr, &mSwapChain);
-	assert(res == VK_SUCCESS);
+	swaggy_assert(res == VK_SUCCESS);
 
 	GetSwapChainImages(mSwapImages);
 	mSwapFormat = format.format;
@@ -199,7 +203,7 @@ void VulkanDoodler::CreateImageViews()
 	for (size_t i = 0; i < mImageViews.size(); ++i)
 	{
 		createInfo.image = mSwapImages[i];
-		assert(vkCreateImageView(mDevice, &createInfo, nullptr, &mImageViews[i]) == VK_SUCCESS);
+		swaggy_assert(vkCreateImageView(mDevice, &createInfo, nullptr, &mImageViews[i]) == VK_SUCCESS);
 	}
 }
 
@@ -316,7 +320,7 @@ void VulkanDoodler::CreateGraphicsPipeline()
 	pipelineLayoutInfo.pSetLayouts = nullptr;
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
-	assert(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mPipelineLayout) == VK_SUCCESS);
+	swaggy_assert(vkCreatePipelineLayout(mDevice, &pipelineLayoutInfo, nullptr, &mPipelineLayout) == VK_SUCCESS);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -336,7 +340,7 @@ void VulkanDoodler::CreateGraphicsPipeline()
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;
 
-	assert(vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) == VK_SUCCESS);
+	swaggy_assert(vkCreateGraphicsPipelines(mDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &mGraphicsPipeline) == VK_SUCCESS);
 
 	vkDestroyShaderModule(mDevice, vertModule, nullptr);
 	vkDestroyShaderModule(mDevice, fragModule, nullptr);
@@ -380,7 +384,7 @@ void VulkanDoodler::CreateRenderPass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	assert(vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass) == VK_SUCCESS);
+	swaggy_assert(vkCreateRenderPass(mDevice, &renderPassInfo, nullptr, &mRenderPass) == VK_SUCCESS);
 }
 
 void VulkanDoodler::CreateFrameBuffers()
@@ -397,7 +401,7 @@ void VulkanDoodler::CreateFrameBuffers()
 		framebufferInfo.height = mSwapExtent.height;
 		framebufferInfo.layers = 1;
 
-		assert(vkCreateFramebuffer(mDevice, &framebufferInfo, nullptr, &mFrameBuffers[i]) == VK_SUCCESS);
+		swaggy_assert(vkCreateFramebuffer(mDevice, &framebufferInfo, nullptr, &mFrameBuffers[i]) == VK_SUCCESS);
 	}
 }
 
@@ -410,7 +414,7 @@ void VulkanDoodler::CreateCommandPool()
 	cmdpoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 	cmdpoolInfo.queueFamilyIndex = index;
 
-	assert(vkCreateCommandPool(mDevice, &cmdpoolInfo, nullptr, &mCommandPool) == VK_SUCCESS);
+	swaggy_assert(vkCreateCommandPool(mDevice, &cmdpoolInfo, nullptr, &mCommandPool) == VK_SUCCESS);
 }
 
 void VulkanDoodler::CreateVertexBuffer()
@@ -492,7 +496,7 @@ void VulkanDoodler::CreateCommandBuffer()
 	bufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	bufferInfo.commandBufferCount = (uint32_t)mCommandBuffer.size();
 
-	assert(vkAllocateCommandBuffers(mDevice, &bufferInfo, mCommandBuffer.data()) == VK_SUCCESS);
+	swaggy_assert(vkAllocateCommandBuffers(mDevice, &bufferInfo, mCommandBuffer.data()) == VK_SUCCESS);
 }
 
 void VulkanDoodler::CreateSyncObjects()
@@ -510,9 +514,9 @@ void VulkanDoodler::CreateSyncObjects()
 	
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreImageAvailable[i]) == VK_SUCCESS);
-		assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreRenderFinish[i]) == VK_SUCCESS);
-		assert(vkCreateFence(mDevice, &fenceInfo, nullptr, &mFenceInFlight[i]) == VK_SUCCESS);
+		swaggy_assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreImageAvailable[i]) == VK_SUCCESS);
+		swaggy_assert(vkCreateSemaphore(mDevice, &semaphoreinfo, nullptr, &mSemaphoreRenderFinish[i]) == VK_SUCCESS);
+		swaggy_assert(vkCreateFence(mDevice, &fenceInfo, nullptr, &mFenceInFlight[i]) == VK_SUCCESS);
 	}
 
 }
@@ -581,7 +585,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	beginInfo.flags = 0;
 	beginInfo.pInheritanceInfo = nullptr;
 
-	assert(vkBeginCommandBuffer(commandbuffer, &beginInfo) == VK_SUCCESS);
+	swaggy_assert(vkBeginCommandBuffer(commandbuffer, &beginInfo) == VK_SUCCESS);
 
 	VkRenderPassBeginInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -617,7 +621,7 @@ void VulkanDoodler::RecordCommandBuffer(VkCommandBuffer commandbuffer, uint32_t 
 	vkCmdDrawIndexed(commandbuffer, (uint32_t)1024 * 3, 1, 0, 0, 0); //HARDOCDED AF
 	
 	vkCmdEndRenderPass(commandbuffer);
-	assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
+	swaggy_assert(vkEndCommandBuffer(commandbuffer) == VK_SUCCESS);
 }
 
 void VulkanDoodler::CopyBuffer(VkBuffer dst, VkBuffer src, VkDeviceSize size)
@@ -663,7 +667,7 @@ void VulkanDoodler::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, Vk
 	bufferInfo.usage = usage;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-	assert(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &buffer) == VK_SUCCESS);
+	swaggy_assert(vkCreateBuffer(mDevice, &bufferInfo, nullptr, &buffer) == VK_SUCCESS);
 
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(mDevice, buffer, &memRequirements);
@@ -673,7 +677,7 @@ void VulkanDoodler::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, Vk
 	vkMemInfo.allocationSize = memRequirements.size;
 	vkMemInfo.memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits, properties);
 
-	assert(vkAllocateMemory(mDevice, &vkMemInfo, nullptr, &memory) == VK_SUCCESS);
+	swaggy_assert(vkAllocateMemory(mDevice, &vkMemInfo, nullptr, &memory) == VK_SUCCESS);
 
 	vkBindBufferMemory(mDevice, buffer, memory, 0);
 }
@@ -684,8 +688,8 @@ VkShaderModule VulkanDoodler::CreateShaderModule(const std::vector<char>& code)
 	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	createInfo.codeSize = code.size();
 	createInfo.pCode = (uint32_t*)code.data();
-	VkShaderModule shaderModule;
-	assert(vkCreateShaderModule(mDevice, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
+	VkShaderModule shaderModule = 0;
+	swaggy_assert(vkCreateShaderModule(mDevice, &createInfo, nullptr, &shaderModule) == VK_SUCCESS);
 	return shaderModule;
 }
 
@@ -798,7 +802,7 @@ VkExtent2D VulkanDoodler::ChooseSwapExtent()
 
 void VulkanDoodler::CreateInstance()
 {
-	assert(!enableValidationLayers || CheckValidationLayerSupported());
+	swaggy_assert(!enableValidationLayers || CheckValidationLayerSupported());
 	std::vector<const char*> glfwExtensions = GetRequiredInstanceExtensions();
 
 	VkApplicationInfo appinfo{};
@@ -828,7 +832,7 @@ void VulkanDoodler::CreateInstance()
 	}
 	createinfo.pNext = nullptr; //default initialization should set this to nullptr
 	VkResult result = vkCreateInstance(&createinfo, nullptr, &mInstance);
-	assert(result == VK_SUCCESS);
+	swaggy_assert(result == VK_SUCCESS);
 
 	uint32_t extensioncount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensioncount, nullptr);
@@ -859,7 +863,7 @@ void VulkanDoodler::SetupMessengerCallback()
 	createinfo.flags = 0;
 
 	
-	assert(CreateDebugUtilsMessengerEXT(mInstance, &createinfo, nullptr, &mDebugMessenger) == VK_SUCCESS);
+	swaggy_assert(CreateDebugUtilsMessengerEXT(mInstance, &createinfo, nullptr, &mDebugMessenger) == VK_SUCCESS);
 }
 
 void VulkanDoodler::GetBestGraphicsDevice()
@@ -867,7 +871,7 @@ void VulkanDoodler::GetBestGraphicsDevice()
 	mPhysicalDevice = VK_NULL_HANDLE;
 	uint32_t devicecount = 0;
 	vkEnumeratePhysicalDevices(mInstance, &devicecount, nullptr);
-	assert(devicecount != 0);
+	swaggy_assert(devicecount != 0);
 	std::vector<VkPhysicalDevice> devices(devicecount);
 	vkEnumeratePhysicalDevices(mInstance, &devicecount, devices.data());
 	int bestscore = 0;
@@ -880,13 +884,13 @@ void VulkanDoodler::GetBestGraphicsDevice()
 			bestscore = score;
 		}
 	}
-	assert(mPhysicalDevice != VK_NULL_HANDLE);
+	swaggy_assert(mPhysicalDevice != VK_NULL_HANDLE);
 }
 
 void VulkanDoodler::CreateLogicalDevice()
 {
-	uint32_t indices;
-	assert(GetQueueFamilyFromFlag(mPhysicalDevice, indices));
+	uint32_t indices = 0;
+	swaggy_assert(GetQueueFamilyFromFlag(mPhysicalDevice, indices));
 	VkDeviceQueueCreateInfo queueCreateInfo{};
 	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 	queueCreateInfo.queueFamilyIndex = indices;
@@ -915,7 +919,7 @@ void VulkanDoodler::CreateLogicalDevice()
 		createInfo.enabledLayerCount = 0;
 	}
 
-	assert(vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) == VK_SUCCESS);
+	swaggy_assert(vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) == VK_SUCCESS);
 
 	vkGetDeviceQueue(mDevice, indices, 0, &mDeviceQueue);
 	vkGetDeviceQueue(mDevice, indices, 0, &mPresentQueue);
@@ -964,13 +968,13 @@ void VulkanDoodler::Update()
 	}
 	else
 	{
-		assert(nextImageRes == VK_SUCCESS || nextImageRes == VK_SUBOPTIMAL_KHR);
+		swaggy_assert(nextImageRes == VK_SUCCESS || nextImageRes == VK_SUBOPTIMAL_KHR);
 	}
 
 	vkResetFences(mDevice, 1, &mFenceInFlight[mCurrentFrame]);
 
 
-	assert(vkResetCommandBuffer(mCommandBuffer[mCurrentFrame], 0) == VK_SUCCESS);
+	swaggy_assert(vkResetCommandBuffer(mCommandBuffer[mCurrentFrame], 0) == VK_SUCCESS);
 	RecordCommandBuffer(mCommandBuffer[mCurrentFrame], imageIndex);
 
 	VkSubmitInfo submitInfo{};
@@ -986,7 +990,7 @@ void VulkanDoodler::Update()
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	assert(vkQueueSubmit(mDeviceQueue, 1, &submitInfo, mFenceInFlight[mCurrentFrame]) == VK_SUCCESS);
+	swaggy_assert(vkQueueSubmit(mDeviceQueue, 1, &submitInfo, mFenceInFlight[mCurrentFrame]) == VK_SUCCESS);
 
 	VkPresentInfoKHR presentInfo{};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1004,7 +1008,7 @@ void VulkanDoodler::Update()
 	}
 	else
 	{
-		assert(resPresent == VK_SUCCESS);
+		swaggy_assert(resPresent == VK_SUCCESS);
 	}
 	++mCurrentFrame %= MAX_FRAMES_IN_FLIGHT;
 }
@@ -1111,7 +1115,7 @@ uint32_t VulkanDoodler::FindMemoryType(uint32_t filter, VkMemoryPropertyFlags pr
 
 	}
 
-	assert(false && "failed to find memory type!");
+	swaggy_assert(false && "failed to find memory type!");
 	return uint32_t();
 }
 
