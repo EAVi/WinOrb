@@ -9,4 +9,4 @@ This is very VERY rough code that I have no intention of polishing because I hav
 2. You'll need VS2019
 3. Build the solution.
 4. run shaders/CompileShaders.bat
-5. run it
+5. run it, the inner workings of the orb are a mystery
